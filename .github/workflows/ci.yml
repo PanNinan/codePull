@@ -1,0 +1,83 @@
+name: CI - Code Quality Check
+
+on:
+  push:
+    branches:
+      - main
+      - dev
+      - 'feature/**'
+  pull_request:
+    branches:
+      - main
+      - dev
+
+jobs:
+  lint-and-test:
+    name: Lint & Syntax Check
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          # PySide6 在 CI 无头环境中体积较大，仅安装 lint 所需依赖
+          pip install paramiko pyinstaller flake8 pylint
+
+      - name: Check syntax (py_compile)
+        run: |
+          python -m py_compile main.py
+          echo "✅ 语法检查通过"
+
+      - name: Flake8 style check
+        run: |
+          flake8 main.py \
+            --max-line-length=120 \
+            --ignore=E501,W503 \
+            --statistics
+        continue-on-error: false
+
+      - name: Pylint static analysis
+        run: |
+          pylint main.py \
+            --disable=C0114,C0115,C0116,R0903,W0611 \
+            --max-line-length=120 \
+            --fail-under=6.0
+        continue-on-error: true   # pylint 分数不足时警告但不阻断
+
+      - name: Verify config schema
+        run: |
+          python - <<'EOF'
+          import json, sys
+
+          with open("config.json", "r", encoding="utf-8") as f:
+              cfg = json.load(f)
+
+          ssh = cfg.get("ssh", {})
+          projects = cfg.get("projects", {})
+
+          required_ssh = ["host", "port", "username", "password"]
+          missing = [k for k in required_ssh if not ssh.get(k)]
+          if missing:
+              print(f"❌ config.json 缺少 SSH 字段: {missing}")
+              sys.exit(1)
+
+          if not projects:
+              print("❌ config.json projects 为空")
+              sys.exit(1)
+
+          for name, proj in projects.items():
+              if not proj.get("path") or not proj.get("branch"):
+                  print(f"❌ 项目 {name} 缺少 path 或 branch")
+                  sys.exit(1)
+
+          print(f"✅ config.json 结构验证通过，共 {len(projects)} 个项目")
+          EOF
