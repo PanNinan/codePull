@@ -20,10 +20,10 @@ from PySide6.QtWidgets import (
 
 DEFAULT_CONFIG = {
     "ssh": {
-        "host": "129.211.190.137",
+        "host": "ip",
         "port": 22,
-        "username": "deploy",
-        "password": "QAZqaz@11",
+        "username": "demo_test",
+        "password": "password",
     },
     "projects": {
         "etc9901": {
