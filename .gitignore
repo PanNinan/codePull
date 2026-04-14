@@ -4,3 +4,7 @@
 *.log
 .DS_Store
 .env
+
+# 含明文 SSH 密码，不允许提交到仓库
+# 请使用 config.example.json 作为模板，在本地复制一份 config.json 并填写真实信息
+config.json

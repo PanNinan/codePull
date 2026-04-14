@@ -1,0 +1,206 @@
+name: Build & Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'        # 例如 v1.0.0、v1.2.3
+
+  # 也允许手动触发构建（不发布 Release）
+  workflow_dispatch:
+    inputs:
+      create_release:
+        description: '是否创建 GitHub Release'
+        required: false
+        default: 'false'
+        type: choice
+        options:
+          - 'true'
+          - 'false'
+
+permissions:
+  contents: write    # 需要写权限才能创建 Release
+
+jobs:
+  # ──────────────────────────────────────────────
+  # Job 1: 使用 PyInstaller 在 Windows 上打包 EXE
+  # ──────────────────────────────────────────────
+  build-windows:
+    name: Build Windows EXE
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Inject config from Secrets (CI 环境使用 Secrets 替换明文密码)
+        shell: pwsh
+        env:
+          SSH_HOST:     ${{ secrets.SSH_HOST }}
+          SSH_PORT:     ${{ secrets.SSH_PORT }}
+          SSH_USERNAME: ${{ secrets.SSH_USERNAME }}
+          SSH_PASSWORD: ${{ secrets.SSH_PASSWORD }}
+        run: |
+          # 仅当 Secrets 存在时才替换 config.json（本地调试无需配置）
+          if ($env:SSH_HOST) {
+            $config = Get-Content config.json -Raw | ConvertFrom-Json
+            $config.ssh.host     = $env:SSH_HOST
+            $config.ssh.port     = [int]$env:SSH_PORT
+            $config.ssh.username = $env:SSH_USERNAME
+            $config.ssh.password = $env:SSH_PASSWORD
+            $config | ConvertTo-Json -Depth 10 | Set-Content config.json -Encoding UTF8
+            Write-Host "✅ config.json 已使用 Secrets 更新"
+          } else {
+            Write-Host "⚠️  未检测到 SSH Secrets，使用仓库默认 config.json"
+          }
+
+      - name: Build EXE with PyInstaller
+        run: |
+          python -m PyInstaller `
+            --noconfirm `
+            --clean `
+            --onefile `
+            --windowed `
+            --name CodePullTool `
+            main.py
+        shell: pwsh
+
+      - name: Verify build output
+        shell: pwsh
+        run: |
+          if (Test-Path "dist\CodePullTool.exe") {
+            $size = (Get-Item "dist\CodePullTool.exe").Length / 1MB
+            Write-Host "✅ 打包成功: dist\CodePullTool.exe ($([math]::Round($size, 2)) MB)"
+          } else {
+            Write-Host "❌ 打包失败：未找到 dist\CodePullTool.exe"
+            exit 1
+          }
+
+      - name: Copy config template alongside EXE
+        shell: pwsh
+        run: |
+          # 生成一份脱敏的 config 模板供用户使用
+          $template = @{
+            ssh = @{
+              host     = "your-server-host"
+              port     = 22
+              username = "your-username"
+              password = "your-password"
+            }
+            projects = @{
+              "project-a" = @{ path = "/www/wwwroot/project-a"; branch = "dev" }
+              "project-b" = @{ path = "/www/wwwroot/project-b"; branch = "release" }
+            }
+          }
+          $template | ConvertTo-Json -Depth 10 | Set-Content "dist\config.json" -Encoding UTF8
+          Write-Host "✅ 已生成脱敏 config.json 模板"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: CodePullTool-windows
+          path: |
+            dist/CodePullTool.exe
+            dist/config.json
+          retention-days: 30
+
+  # ──────────────────────────────────────────────
+  # Job 2: 创建 GitHub Release 并上传 EXE
+  # ──────────────────────────────────────────────
+  create-release:
+    name: Create GitHub Release
+    needs: build-windows
+    runs-on: ubuntu-latest
+    # 仅在 tag push 时，或手动选择 create_release=true 时执行
+    if: |
+      startsWith(github.ref, 'refs/tags/v') ||
+      github.event.inputs.create_release == 'true'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: CodePullTool-windows
+          path: dist/
+
+      - name: Get tag name
+        id: tag
+        run: |
+          if [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            echo "tag=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+          else
+            echo "tag=manual-$(date +'%Y%m%d-%H%M%S')" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Generate release notes
+        id: notes
+        run: |
+          TAG="${{ steps.tag.outputs.tag }}"
+          cat > release_notes.md << EOF
+          ## CodePullTool ${TAG}
+
+          ### 📦 下载说明
+
+          | 文件 | 说明 |
+          |------|------|
+          | \`CodePullTool.exe\` | Windows 可执行文件（双击运行，无需安装 Python） |
+          | \`config.json\` | 配置文件模板（请修改后放在与 EXE 相同目录） |
+
+          ### 🚀 使用方法
+
+          1. 下载 \`CodePullTool.exe\` 和 \`config.json\`
+          2. 编辑 \`config.json\`，填入你的服务器 SSH 信息和项目配置
+          3. 双击 \`CodePullTool.exe\` 运行
+
+          ### ⚙️ 运行环境
+
+          - Windows 10 / 11（x64）
+          - 无需安装 Python
+
+          ### 📝 配置格式
+
+          \`\`\`json
+          {
+            "ssh": {
+              "host": "your-server-ip",
+              "port": 22,
+              "username": "your-username",
+              "password": "your-password"
+            },
+            "projects": {
+              "project-name": {
+                "path": "/www/wwwroot/project-name",
+                "branch": "dev"
+              }
+            }
+          }
+          \`\`\`
+          EOF
+          echo "✅ Release notes 生成完毕"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.tag.outputs.tag }}
+          name: "CodePullTool ${{ steps.tag.outputs.tag }}"
+          body_path: release_notes.md
+          draft: false
+          prerelease: ${{ contains(steps.tag.outputs.tag, 'beta') || contains(steps.tag.outputs.tag, 'rc') }}
+          files: |
+            dist/CodePullTool.exe
+            dist/config.json
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
