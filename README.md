@@ -103,7 +103,16 @@ pip install -r requirements.txt
 
 ## 使用方法
 
-### 方式一：直接运行源码
+### 方式一：下载 Release EXE（推荐）
+
+无需安装 Python，直接使用：
+
+1. 前往 [Releases 页面](https://github.com/YOUR_USERNAME/YOUR_REPO/releases) 下载最新版本的 `CodePullTool.exe` 和 `config.json`
+2. 将两个文件放到同一目录
+3. 编辑 `config.json`，填入真实服务器信息
+4. 双击 `CodePullTool.exe` 运行
+
+### 方式二：直接运行源码
 
 在项目目录下执行：
 
@@ -119,7 +128,7 @@ python main.py
 4. 在下方日志窗口中查看执行过程
 5. 拉取完成后会弹出完成提示
 
-### 方式二：打包为 EXE 后运行
+### 方式三：打包为 EXE 后运行
 
 执行打包脚本：
 
@@ -134,6 +143,25 @@ CodePullTool.exe
 ```
 
 双击即可运行。
+
+### 方式四：GitHub Actions 自动打包（推荐给维护者）
+
+推送版本 tag 即可自动构建并发布：
+
+```bash
+# 提交代码
+git add .
+git commit -m "feat: 新功能"
+git push origin main
+
+# 推送版本 tag，触发自动打包
+git tag v1.0.0
+git push origin v1.0.0
+```
+
+Actions 将自动完成：代码检查 → PyInstaller 打包 → 创建 GitHub Release → 上传 EXE。
+
+> 详细配置说明见 [`.github/ACTIONS_GUIDE.md`](.github/ACTIONS_GUIDE.md)
 
 ## 程序执行流程
 
@@ -166,7 +194,7 @@ cd <path> && git fetch origin && git checkout <branch> && git pull origin <branc
 - 请确保配置的目录中存在 Git 仓库
 - 请确保配置的分支在远程仓库中存在
 - 如果首次运行时没有 `config.json`，程序会自动生成默认配置文件
-- 建议不要在仓库中提交真实的服务器密码，可根据实际情况改为更安全的配置方式
+- ⚠️ **`config.json` 已加入 `.gitignore`，不会提交到仓库**；请使用 `config.example.json` 作为模板，在本地复制一份 `config.json` 并填写真实信息
 
 ## 常见问题
 
