@@ -1,5 +1,10 @@
 # CodePull 项目说明
 
+[![CI](https://github.com/YOUR_USERNAME/YOUR_REPO/actions/workflows/ci.yml/badge.svg)](https://github.com/YOUR_USERNAME/YOUR_REPO/actions/workflows/ci.yml)
+[![Build & Release](https://github.com/YOUR_USERNAME/YOUR_REPO/actions/workflows/build-release.yml/badge.svg)](https://github.com/YOUR_USERNAME/YOUR_REPO/actions/workflows/build-release.yml)
+
+> 📦 **直接下载**：无需安装 Python，直接在 [Releases](https://github.com/YOUR_USERNAME/YOUR_REPO/releases) 页面下载最新 `CodePullTool.exe`。
+
 ## 项目简介
 
 CodePull 是一个基于 Python + PySide6 开发的桌面工具，用于通过 SSH 连接远程服务器，并对配置好的代码项目执行 Git 拉取操作。
@@ -20,11 +25,17 @@ CodePull 是一个基于 Python + PySide6 开发的桌面工具，用于通过 S
 
 ```text
 codePull/
-├── main.py               # 主程序入口
-├── config.json           # SSH 和项目配置文件
-├── requirements.txt      # Python 依赖
-├── build.bat             # 打包脚本
-└── CodePullTool.spec     # PyInstaller 配置文件
+├── main.py                          # 主程序入口
+├── config.json                      # SSH 和项目配置文件（本地使用，不提交到仓库）
+├── config.example.json              # 配置模板（无密码，随代码提交）
+├── requirements.txt                 # Python 依赖
+├── build.bat                        # 本地手动打包脚本
+├── CodePullTool.spec                # PyInstaller 配置文件
+└── .github/
+    ├── workflows/
+    │   ├── ci.yml                   # CI：代码检查 & 配置验证
+    │   └── build-release.yml        # CD：Windows EXE 打包 & 自动发布
+    └── ACTIONS_GUIDE.md             # GitHub Actions 配置说明
 ```
 
 ## 运行环境
