@@ -1,9 +1,9 @@
 # CodePull 项目说明
 
-[![CI](https://github.com/YOUR_USERNAME/YOUR_REPO/actions/workflows/ci.yml/badge.svg)](https://github.com/YOUR_USERNAME/YOUR_REPO/actions/workflows/ci.yml)
-[![Build & Release](https://github.com/YOUR_USERNAME/YOUR_REPO/actions/workflows/build-release.yml/badge.svg)](https://github.com/YOUR_USERNAME/YOUR_REPO/actions/workflows/build-release.yml)
+[![CI](https://github.com/PanNinan/codePull/actions/workflows/ci.yml/badge.svg)](https://github.com/PanNinan/codePull/actions/workflows/ci.yml)
+[![Build & Release](https://github.com/PanNinan/codePull/actions/workflows/build-release.yml/badge.svg)](https://github.com/PanNinan/codePull/actions/workflows/build-release.yml)
 
-> 📦 **直接下载**：无需安装 Python，直接在 [Releases](https://github.com/YOUR_USERNAME/YOUR_REPO/releases) 页面下载最新 `CodePullTool.exe`。
+> 📦 **直接下载**：无需安装 Python，直接在 [Releases](https://github.com/PanNinan/codePull/releases) 页面下载最新 `CodePullTool.exe`。
 
 ## 项目简介
 
