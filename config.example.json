@@ -1,18 +1,14 @@
 {
   "ssh": {
-    "host": "your-server-host",
+    "host": "YOUR_SERVER_IP",
     "port": 22,
-    "username": "your-username",
-    "password": "your-password"
+    "username": "YOUR_SSH_USERNAME",
+    "password": "YOUR_SSH_PASSWORD"
   },
   "projects": {
-    "project-a": {
-      "path": "/www/wwwroot/project-a",
-      "branch": "dev"
-    },
-    "project-b": {
-      "path": "/www/wwwroot/project-b",
-      "branch": "release"
+    "project-name": {
+      "path": "/www/wwwroot/project-name",
+      "branch": "main"
     }
   }
 }

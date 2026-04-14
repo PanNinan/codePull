@@ -1,83 +1,96 @@
-name: CI - Code Quality Check
+name: CI
 
 on:
   push:
-    branches:
-      - main
-      - dev
-      - 'feature/**'
+    branches: [ "main", "master", "dev*" ]
   pull_request:
-    branches:
-      - main
-      - dev
+    branches: [ "main", "master" ]
 
 jobs:
-  lint-and-test:
-    name: Lint & Syntax Check
+  lint-and-validate:
+    name: 代码检查与配置验证
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
+      - name: 检出代码
         uses: actions/checkout@v4
 
-      - name: Set up Python
+      # ── Python 环境 ─────────────────────────────────────────────────────────
+      - name: 设置 Python 3.11
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
-          cache: 'pip'
+          python-version: "3.11"
+          cache: "pip"
 
-      - name: Install dependencies
+      # ── 安装 lint 工具（不安装 PySide6/pyinstaller，加快 CI 速度）──────────
+      - name: 安装检查工具
         run: |
-          python -m pip install --upgrade pip
-          # PySide6 在 CI 无头环境中体积较大，仅安装 lint 所需依赖
-          pip install paramiko pyinstaller flake8 pylint
+          pip install --upgrade pip
+          pip install flake8 pylint
 
-      - name: Check syntax (py_compile)
-        run: |
-          python -m py_compile main.py
-          echo "✅ 语法检查通过"
+      # ── 语法检查 ─────────────────────────────────────────────────────────────
+      - name: 语法检查 (py_compile)
+        run: python -m py_compile main.py && echo "✅ 语法检查通过"
 
-      - name: Flake8 style check
+      # ── Flake8 风格检查 ───────────────────────────────────────────────────────
+      - name: Flake8 风格检查
         run: |
           flake8 main.py \
             --max-line-length=120 \
-            --ignore=E501,W503 \
+            --extend-ignore=E501 \
             --statistics
         continue-on-error: false
 
-      - name: Pylint static analysis
+      # ── Pylint 静态分析（评分低于 6.0 仅警告，不阻断 CI）──────────────────
+      - name: Pylint 静态分析
         run: |
           pylint main.py \
             --disable=C0114,C0115,C0116,R0903,W0611 \
             --max-line-length=120 \
-            --fail-under=6.0
-        continue-on-error: true   # pylint 分数不足时警告但不阻断
+            --fail-under=6.0 || true
+        continue-on-error: true
 
-      - name: Verify config schema
+      # ── config.example.json 结构验证 ──────────────────────────────────────
+      - name: 验证 config.example.json 结构
         run: |
           python - <<'EOF'
           import json, sys
 
-          with open("config.json", "r", encoding="utf-8") as f:
+          with open("config.example.json", encoding="utf-8") as f:
               cfg = json.load(f)
 
+          errors = []
+
+          # 检查 SSH 字段
           ssh = cfg.get("ssh", {})
+          for key in ["host", "port", "username", "password"]:
+              if key not in ssh:
+                  errors.append(f"config.example.json 缺少 ssh.{key}")
+
+          # 检查 projects 字段
           projects = cfg.get("projects", {})
-
-          required_ssh = ["host", "port", "username", "password"]
-          missing = [k for k in required_ssh if not ssh.get(k)]
-          if missing:
-              print(f"❌ config.json 缺少 SSH 字段: {missing}")
-              sys.exit(1)
-
           if not projects:
-              print("❌ config.json projects 为空")
-              sys.exit(1)
-
+              errors.append("config.example.json 中 projects 不能为空")
           for name, proj in projects.items():
-              if not proj.get("path") or not proj.get("branch"):
-                  print(f"❌ 项目 {name} 缺少 path 或 branch")
-                  sys.exit(1)
+              for key in ["path", "branch"]:
+                  if key not in proj:
+                      errors.append(f"projects.{name} 缺少字段: {key}")
 
-          print(f"✅ config.json 结构验证通过，共 {len(projects)} 个项目")
+          if errors:
+              print("❌ 配置结构验证失败:")
+              for e in errors:
+                  print(f"  - {e}")
+              sys.exit(1)
+          else:
+              print("✅ config.example.json 结构验证通过")
           EOF
+
+      # ── 确认 config.json 未入库 ───────────────────────────────────────────
+      - name: 确认 config.json 未入库（安全检查）
+        run: |
+          if git ls-files --error-unmatch config.json 2>/dev/null; then
+            echo "❌ 危险：config.json 被提交到了仓库，含有明文密码，请立即移除！"
+            exit 1
+          else
+            echo "✅ config.json 未入库，安全检查通过"
+          fi
