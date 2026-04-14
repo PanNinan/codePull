@@ -1,0 +1,6 @@
+./build
+./dist
+./*.spec
+*.log
+.DS_Store
+.env
